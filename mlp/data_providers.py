@@ -123,7 +123,7 @@ class MNISTDataProvider(DataProvider):
         data_path = os.path.join(
             os.environ['MLP_DATA_DIR'], 'mnist-{0}.npz'.format(which_set))
         assert os.path.isfile(data_path), (
-            'Data file does not exist at expected path: ' + data_path
+                'Data file does not exist at expected path: ' + data_path
         )
         # load data from compressed numpy file
         loaded = np.load(data_path)
@@ -133,11 +133,11 @@ class MNISTDataProvider(DataProvider):
         super(MNISTDataProvider, self).__init__(
             inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
 
-    # def next(self):
-    #    """Returns next data batch or raises `StopIteration` if at end."""
-    #    inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
-    #    return inputs_batch, self.to_one_of_k(targets_batch)
-    #
+    def next(self):
+        """Returns next data batch or raises `StopIteration` if at end."""
+        inputs_batch, targets_batch = super(MNISTDataProvider, self).next()
+        return inputs_batch, self.to_one_of_k(targets_batch)
+
     def __next__(self):
         return self.next()
 
@@ -156,7 +156,12 @@ class MNISTDataProvider(DataProvider):
             to zero except for the column corresponding to the correct class
             which is equal to one.
         """
-        raise NotImplementedError()
+        mappings = []
+        for int_target in int_targets:
+            mapping = [0] * self.num_classes
+            mapping[int_target] = 1
+            mappings.append(mapping)
+        return np.array(mappings)
 
 
 class MetOfficeDataProvider(DataProvider):
@@ -164,7 +169,7 @@ class MetOfficeDataProvider(DataProvider):
 
     def __init__(self, window_size, batch_size=10, max_num_batches=-1,
                  shuffle_order=True, rng=None):
-        """Create a new Met Offfice data provider object.
+        """Create a new Met Office data provider object.
 
         Args:
             window_size (int): Size of windows to split weather time series
@@ -185,22 +190,25 @@ class MetOfficeDataProvider(DataProvider):
         data_path = os.path.join(
             os.environ['MLP_DATA_DIR'], 'HadSSP_daily_qc.txt')
         assert os.path.isfile(data_path), (
-            'Data file does not exist at expected path: ' + data_path
+                'Data file does not exist at expected path: ' + data_path
         )
         # load raw data from text file
-        # ...
+        loaded = np.loadtxt(data_path, skiprows=3, usecols=tuple(range(2, 33)))
         # filter out all missing datapoints and flatten to a vector
-        # ...
+        data = loaded.flatten()
+        data = data[data != -99.99]
         # normalise data to zero mean, unit standard deviation
-        # ...
+        data = (data - np.mean(data)) / np.std(data)
         # convert from flat sequence to windowed data
-        # ...
+        data = np.lib.stride_tricks.sliding_window_view(
+            data, window_shape=window_size)
         # inputs are first (window_size - 1) entries in windows
-        # inputs = ...
+        inputs = data[:, :window_size-1]
         # targets are last entry in windows
-        # targets = ...
+        targets = data[:, -1]
         # initialise base class with inputs and targets arrays
-        # super(MetOfficeDataProvider, self).__init__(
-        #     inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
+        super(MetOfficeDataProvider, self).__init__(
+            inputs, targets, batch_size, max_num_batches, shuffle_order, rng)
+
     def __next__(self):
-            return self.next()
+        return self.next()
